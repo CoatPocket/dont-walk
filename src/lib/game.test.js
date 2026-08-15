@@ -277,3 +277,94 @@ describe('density increases on win and stays on fail', () => {
     expect(game.screen).toBe('play')
   })
 })
+
+describe('opening stays empty and flip only crashes mid-crossing', () => {
+  it('seeds approaches well behind the stop line, not in the box', () => {
+    const game = createGame({ seed: 7, autoSpawn: true, sittingLength: 10 })
+    startShift(game)
+    expect(game.actors.length).toBeGreaterThan(0)
+    for (const a of game.actors) {
+      expect(a.t).toBeLessThan(a.stopT)
+      expect(a.committed).toBe(false)
+      expect(isCommitted(a)).toBe(false)
+    }
+    flip(game)
+    expect(game.fail).toBe(null)
+    expect(game.phase).toBe('amber')
+  })
+
+  it('keeps the crossing empty for a couple of seconds at shift start', () => {
+    const game = createGame({ seed: 11, autoSpawn: true, sittingLength: 10 })
+    startShift(game)
+    tick(game, 2)
+    expect(game.fail).toBe(null)
+    expect(hasCommitted(game)).toBe(false)
+    for (const a of game.actors) {
+      expect(a.t).toBeLessThanOrEqual(a.stopT)
+    }
+  })
+
+  it('does not crash-on-flip for a committed body still at the stop line', () => {
+    const game = fresh()
+    addActor(game, {
+      kind: 'car',
+      t: 0.36,
+      stopT: 0.36,
+      exitT: 0.64,
+      committed: true,
+    })
+    expect(hasCommitted(game)).toBe(false)
+    flip(game)
+    expect(game.fail).toBe(null)
+    expect(game.phase).toBe('amber')
+  })
+})
+
+describe('actors finish a crossing and increment quota', () => {
+  it('increments car quota when a car rolls off the far side', () => {
+    const game = fresh()
+    addActor(game, {
+      kind: 'car',
+      t: 0.5,
+      stopT: 0.36,
+      exitT: 0.64,
+      committed: true,
+      speed: 0.4,
+    })
+    tick(game, 2)
+    expect(game.carsCleared).toBe(1)
+    expect(game.actors.some((a) => a.kind === 'car')).toBe(false)
+  })
+
+  it('increments people quota when a person finishes the crossing', () => {
+    const game = fresh()
+    game.signal = 'people'
+    addActor(game, {
+      kind: 'person',
+      t: 0.5,
+      stopT: 0.36,
+      exitT: 0.64,
+      committed: true,
+      speed: 0.4,
+    })
+    tick(game, 2)
+    expect(game.peopleCleared).toBe(1)
+  })
+
+  it('keeps rolling after leaving the box instead of snapping back', () => {
+    const game = fresh()
+    const car = addActor(game, {
+      kind: 'car',
+      t: 0.62,
+      stopT: 0.36,
+      exitT: 0.64,
+      committed: true,
+      speed: 0.2,
+    })
+    tick(game, 0.2)
+    expect(car.t).toBeGreaterThan(0.64)
+    expect(car.committed).toBe(false)
+    tick(game, 2)
+    expect(game.carsCleared).toBe(1)
+  })
+})
