@@ -11,6 +11,10 @@ export const MAX_PEOPLE = 6
 export const BASE_PEOPLE_QUOTA = 6
 export const BASE_CARS_QUOTA = 6
 export const QUOTA_PER_DENSITY = 2
+export const DEFAULT_STOP_T = 0.26
+export const DEFAULT_EXIT_T = 0.74
+export const CAR_GAP = 0.14
+export const PERSON_GAP = 0.10
 
 export const CAR_COLORS = [
   '#e85d4c',
@@ -91,10 +95,19 @@ export function spawnInterval(density, kind) {
   return Math.max(0.65, base / (0.6 + density * 0.4))
 }
 
+export function headingForLane(lane) {
+  return lane === 0 ? 1 : -1
+}
+
+export function pathGap(kind) {
+  return kind === 'car' ? CAR_GAP : PERSON_GAP
+}
+
 function pickLaneAndHeading(rng) {
+  const lane = rng() < 0.5 ? 0 : 1
   return {
-    lane: rng() < 0.5 ? 0 : 1,
-    heading: rng() < 0.5 ? 1 : -1,
+    lane,
+    heading: headingForLane(lane),
   }
 }
 
@@ -102,16 +115,18 @@ export function makeActor(game, spec = {}) {
   const kind = spec.kind === 'person' ? 'person' : 'car'
   const rng = game.rng
   const place = pickLaneAndHeading(rng)
+  const lane = spec.lane ?? place.lane
+  const heading = headingForLane(lane)
   const speed = kind === 'car' ? 0.32 + rng() * 0.06 : 0.2 + rng() * 0.05
   const maxWait = (kind === 'car' ? 16 : 18) * (0.85 + rng() * 0.3) / Math.sqrt(Math.max(1, game.density))
   const actor = {
     id: spec.id ?? game.nextId++,
     kind,
-    lane: spec.lane ?? place.lane,
-    heading: spec.heading ?? place.heading,
+    lane,
+    heading,
     t: spec.t ?? 0,
-    stopT: spec.stopT ?? 0.36,
-    exitT: spec.exitT ?? 0.64,
+    stopT: spec.stopT ?? DEFAULT_STOP_T,
+    exitT: spec.exitT ?? DEFAULT_EXIT_T,
     speed: spec.speed ?? speed,
     committed: spec.committed ?? false,
     waiting: spec.waiting ?? false,
@@ -135,21 +150,41 @@ function countKind(game, kind) {
   return game.actors.filter((a) => a.kind === kind).length
 }
 
-function lastOnPath(game, kind, lane, heading) {
+function lastOnPath(game, kind, lane) {
   let best = null
   for (const a of game.actors) {
-    if (a.kind !== kind || a.lane !== lane || a.heading !== heading) continue
+    if (a.kind !== kind || a.lane !== lane) continue
     if (!best || a.t < best.t) best = a
   }
   return best
+}
+
+function nearestAhead(game, actor) {
+  let best = null
+  for (const a of game.actors) {
+    if (a === actor || a.id === actor.id) continue
+    if (a.kind !== actor.kind || a.lane !== actor.lane) continue
+    if (a.t <= actor.t) continue
+    if (!best || a.t < best.t) best = a
+  }
+  return best
+}
+
+function limitByQueue(game, actor, desiredT) {
+  const ahead = nearestAhead(game, actor)
+  if (!ahead) return desiredT
+  const cap = ahead.t - pathGap(actor.kind)
+  if (desiredT <= cap) return desiredT
+  return Math.max(actor.t, cap)
 }
 
 function trySpawn(game, kind) {
   const max = kind === 'car' ? MAX_CARS : MAX_PEOPLE
   if (countKind(game, kind) >= max) return null
   const place = pickLaneAndHeading(game.rng)
-  const ahead = lastOnPath(game, kind, place.lane, place.heading)
-  if (ahead && ahead.t < 0.2) return null
+  const rear = lastOnPath(game, kind, place.lane)
+  const gap = pathGap(kind)
+  if (rear && rear.t < gap + 0.02) return null
   return addActor(game, { kind, ...place, t: 0 })
 }
 
@@ -159,17 +194,15 @@ function seedApproach(game) {
   for (let i = 0; i < cars; i += 1) {
     addActor(game, {
       kind: 'car',
-      t: -0.62 + i * 0.08,
+      t: -0.88 + i * 0.16,
       lane: i % 2,
-      heading: i % 2 === 0 ? 1 : -1,
     })
   }
   for (let i = 0; i < people; i += 1) {
     addActor(game, {
       kind: 'person',
-      t: -0.40 + i * 0.08,
+      t: -0.76 + i * 0.16,
       lane: i % 2,
-      heading: i % 2 === 0 ? 1 : -1,
     })
   }
 }
@@ -293,7 +326,7 @@ function stepActor(game, actor, dt) {
   // Never snap back to the stop line (that froze both quotas at 0).
   if (actor.committed || actor.t >= actor.exitT) {
     actor.waiting = false
-    actor.t += actor.speed * dt
+    actor.t = limitByQueue(game, actor, actor.t + actor.speed * dt)
     if (actor.t >= actor.exitT) {
       actor.committed = false
     }
@@ -322,17 +355,20 @@ function stepActor(game, actor, dt) {
       }
       actor.committed = true
       actor.waiting = false
+      actor.t = limitByQueue(game, actor, actor.t + actor.speed * dt * 0.25)
     }
     return
   }
 
-  const next = actor.t + actor.speed * dt
+  const next = limitByQueue(game, actor, actor.t + actor.speed * dt)
   if (next < actor.stopT) {
     actor.t = next
     return
   }
 
-  actor.t = actor.stopT
+  actor.t = Math.min(actor.stopT, next)
+  if (actor.t < actor.stopT) return
+
   const green = actorHasGreen(game, actor) && game.phase === 'steady'
   const defy = !actorHasGreen(game, actor) && wantsDefy(game, actor, dt)
   if (green || defy) {
@@ -342,7 +378,7 @@ function stepActor(game, actor, dt) {
       return
     }
     actor.committed = true
-    actor.t += actor.speed * dt * 0.25
+    actor.t = limitByQueue(game, actor, actor.t + actor.speed * dt * 0.25)
   } else {
     actor.waiting = true
   }
@@ -380,7 +416,8 @@ export function tick(game, dt) {
   if (game.signal === 'cars') game.carsGreenTime += dt
   else game.peopleGreenTime += dt
 
-  for (const actor of game.actors) {
+  const order = game.actors.slice().sort((a, b) => b.t - a.t)
+  for (const actor of order) {
     if (game.fail) break
     stepActor(game, actor, dt)
   }
