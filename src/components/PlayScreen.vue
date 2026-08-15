@@ -132,8 +132,14 @@ function spriteStyle(actor) {
       type="button"
       @pointerdown="onFlip"
     >
-      <span class="flip-hint">TAP TO FLIP</span>
-      <span class="flip-sub">one bit · one tap · 0.6s amber</span>
+      <span class="flip-hint">
+        <template v-if="face === 'amber'">AMBER</template>
+        <template v-else>TAP TO FLIP</template>
+      </span>
+      <span class="flip-sub">
+        <template v-if="face === 'amber'">hold · 0.6s</template>
+        <template v-else>one bit · one tap · 0.6s amber</template>
+      </span>
     </button>
   </div>
 </template>
@@ -338,16 +344,24 @@ function spriteStyle(actor) {
 
 .signal.amber .signal-box {
   border-color: #ffc107;
-  box-shadow: 0 0 22px #ffc10788;
+  box-shadow: 0 0 28px #ffc107cc, 0 0 48px #ffc10766;
 }
-.signal.amber .led { background: #2a2208; }
-.signal.amber .led svg { fill: #ffc107; }
+.signal.amber .led { background: #3a2c08; }
+.signal.amber .led svg { fill: #ffc107; filter: drop-shadow(0 0 6px #ffc107); }
+.signal.amber .signal-glow {
+  opacity: 1;
+  background: #ffc107;
+}
 
 .signal-caption {
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.22em;
+}
+.signal.amber .signal-caption {
+  font-size: 14px;
+  text-shadow: 0 0 10px #ffc107;
 }
 
 .signal.dont-walk .signal-caption { color: #ff4d2e; }
@@ -485,23 +499,43 @@ function spriteStyle(actor) {
 .bar {
   position: absolute;
   left: 50%;
-  top: -8px;
-  width: 24px;
-  height: 4px;
+  top: -12px;
+  width: 42px;
+  height: 7px;
   transform: translateX(-50%);
-  background: #14161c;
-  border: 1px solid #000;
+  background: #07080b;
+  border: 2px solid #f4f1ea;
   border-radius: 99px;
   overflow: hidden;
+  z-index: 5;
+  box-shadow: 0 0 0 1px #000, 0 2px 6px rgba(0, 0, 0, 0.65);
+}
+
+.actor.person .bar {
+  width: 28px;
+  height: 7px;
+  top: -13px;
+}
+
+.actor.car .bar {
+  width: 42px;
+  height: 8px;
+  top: -12px;
 }
 
 .bar i {
   display: block;
   height: 100%;
-  background: #7dffa0;
+  background: #3dff7a;
 }
 
+.actor.calm .bar i { background: #3dff7a; }
 .actor.tight .bar i { background: #ffc107; }
+.actor.tight .bar { border-color: #ffc107; }
+.actor.flashing .bar {
+  border-color: #ff4d2e;
+  box-shadow: 0 0 8px #ff4d2e;
+}
 .actor.flashing .bar i {
   background: #ff4d2e;
   animation: pulse 0.28s steps(2) infinite;
@@ -539,7 +573,12 @@ function spriteStyle(actor) {
 
 .flip-zone.dont-walk .flip-hint { color: #ff4d2e; }
 .flip-zone.walk .flip-hint { color: #d8f5c8; }
-.flip-zone.amber .flip-hint { color: #ffc107; }
+.flip-zone.amber .flip-hint {
+  color: #ffc107;
+  text-shadow: 0 0 12px #ffc107;
+  font-size: 26px;
+}
+.flip-zone.amber .flip-sub { color: #ffc107; }
 
 .flip-sub {
   font-size: 11px;
