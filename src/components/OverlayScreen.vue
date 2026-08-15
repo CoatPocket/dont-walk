@@ -85,26 +85,35 @@ function onTap(ev) {
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 20;
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 28px 22px;
-  background: rgba(7, 8, 11, 0.78);
-  backdrop-filter: blur(6px);
+  background: rgba(5, 6, 9, 0.94);
+  backdrop-filter: blur(10px);
   -webkit-tap-highlight-color: transparent;
   cursor: pointer;
   text-align: left;
 }
 
-.overlay.title {
-  background: rgba(7, 8, 11, 0.92);
+.overlay.title,
+.overlay.fail,
+.overlay.shift-win,
+.overlay.breath,
+.overlay.sitting-win {
+  background: rgba(5, 6, 9, 0.96);
 }
 
 .panel {
   width: 100%;
   max-width: 360px;
+  padding: 22px 20px 24px;
+  border-radius: 14px;
+  background: #0b0c10;
+  box-shadow: 0 0 0 1px #2a2d36, 0 18px 48px rgba(0, 0, 0, 0.72);
 }
 
 .kicker {
@@ -112,7 +121,7 @@ function onTap(ev) {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.22em;
-  color: #8b8e99;
+  color: #d0d2da;
 }
 
 h1 {
@@ -120,19 +129,21 @@ h1 {
   font-size: clamp(40px, 12vw, 56px);
   line-height: 0.92;
   letter-spacing: -0.03em;
+  color: #f4f1ea;
+  text-shadow: 0 2px 0 #000;
 }
 
-.overlay.fail h1 { color: #ff4d2e; }
+.overlay.fail h1 { color: #ff6a4d; }
 .overlay.shift-win h1 { color: #d8f5c8; }
 .overlay.breath h1 { color: #ffc107; }
 .overlay.sitting-win h1 { color: #9fd4ff; }
-.overlay.title h1 { color: #ff4d2e; }
+.overlay.title h1 { color: #ff6a4d; }
 
 .blurb {
   margin: 0 0 28px;
   font-size: 16px;
   line-height: 1.4;
-  color: #c6c3bb;
+  color: #f4f1ea;
   max-width: 28ch;
 }
 
@@ -141,6 +152,6 @@ h1 {
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.2em;
-  color: #f4f1ea;
+  color: #ffffff;
 }
 </style>
