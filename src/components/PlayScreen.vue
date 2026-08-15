@@ -426,8 +426,8 @@ function spriteStyle(actor) {
   width: 3px;
   background: #f4f1ea;
 }
-.stop-line.left { left: 36%; }
-.stop-line.right { right: 36%; }
+.stop-line.left { left: 26%; }
+.stop-line.right { right: 26%; }
 
 .actor {
   position: absolute;
