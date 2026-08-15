@@ -70,7 +70,7 @@ export function carsHaveGreen(game) {
 }
 
 export function isCommitted(actor) {
-  return Boolean(actor.committed && actor.t < actor.exitT)
+  return Boolean(actor.committed && actor.t > actor.stopT && actor.t < actor.exitT)
 }
 
 export function hasCommitted(game) {
@@ -159,7 +159,7 @@ function seedApproach(game) {
   for (let i = 0; i < cars; i += 1) {
     addActor(game, {
       kind: 'car',
-      t: 0.02 + i * 0.1,
+      t: -0.62 + i * 0.08,
       lane: i % 2,
       heading: i % 2 === 0 ? 1 : -1,
     })
@@ -167,7 +167,7 @@ function seedApproach(game) {
   for (let i = 0; i < people; i += 1) {
     addActor(game, {
       kind: 'person',
-      t: 0.04 + i * 0.09,
+      t: -0.40 + i * 0.08,
       lane: i % 2,
       heading: i % 2 === 0 ? 1 : -1,
     })
@@ -210,7 +210,7 @@ function resetShiftPlay(game) {
   game.fail = null
   game.won = false
   game.actors = []
-  game.spawnTimer = { car: 0.4, person: 0.9 }
+  game.spawnTimer = { car: 2.4, person: 2.8 }
   if (game.autoSpawn) seedApproach(game)
 }
 
@@ -289,7 +289,9 @@ function clearActor(game, actor) {
 function stepActor(game, actor, dt) {
   if (actor.t >= 1) return
 
-  if (actor.committed) {
+  // Past the box, or still committed through it: keep rolling off and count a clear.
+  // Never snap back to the stop line (that froze both quotas at 0).
+  if (actor.committed || actor.t >= actor.exitT) {
     actor.waiting = false
     actor.t += actor.speed * dt
     if (actor.t >= actor.exitT) {
