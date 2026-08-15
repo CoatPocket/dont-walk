@@ -15,8 +15,7 @@ const title = computed(() => {
       return "DON'T WALK"
     case 'fail':
       if (props.game.fail === 'crash') return 'CRASH'
-    case 'riot':
-      return 'RIOT'
+      if (props.game.fail === 'riot') return 'RIOT'
       return 'SHIFT OVER'
     case 'shift-win':
       return 'SHIFT CLEAR'
