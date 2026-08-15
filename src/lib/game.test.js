@@ -19,6 +19,10 @@ import {
   recordBias,
   patienceLevel,
   isCommitted,
+  CAR_GAP,
+  PERSON_GAP,
+  DEFAULT_STOP_T,
+  DEFAULT_EXIT_T,
 } from './game.js'
 
 function fresh(opts = {}) {
@@ -80,8 +84,8 @@ describe('amber lasts 0.6s and committed bodies stay committed', () => {
     const body = addActor(game, {
       kind: 'car',
       t: 0.45,
-      stopT: 0.36,
-      exitT: 0.64,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
       speed: 0.05,
     })
@@ -101,8 +105,8 @@ describe('crash if you flip a committed body', () => {
     addActor(game, {
       kind: 'person',
       t: 0.5,
-      stopT: 0.36,
-      exitT: 0.64,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
     })
     expect(hasCommitted(game)).toBe(true)
@@ -123,8 +127,8 @@ describe('crash if you flip a committed body', () => {
     const game = fresh()
     addActor(game, {
       kind: 'car',
-      t: 0.7,
-      exitT: 0.64,
+      t: 0.8,
+      exitT: 0.74,
       committed: false,
     })
     flip(game)
@@ -137,7 +141,7 @@ describe('riot if any patience hits 0', () => {
     const game = fresh()
     addActor(game, {
       kind: 'person',
-      t: 0.36,
+      t: 0.26,
       waiting: true,
       patience: 0.05,
       maxWait: 1,
@@ -308,9 +312,9 @@ describe('opening stays empty and flip only crashes mid-crossing', () => {
     const game = fresh()
     addActor(game, {
       kind: 'car',
-      t: 0.36,
-      stopT: 0.36,
-      exitT: 0.64,
+      t: 0.26,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
     })
     expect(hasCommitted(game)).toBe(false)
@@ -326,8 +330,8 @@ describe('actors finish a crossing and increment quota', () => {
     addActor(game, {
       kind: 'car',
       t: 0.5,
-      stopT: 0.36,
-      exitT: 0.64,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
       speed: 0.4,
     })
@@ -342,8 +346,8 @@ describe('actors finish a crossing and increment quota', () => {
     addActor(game, {
       kind: 'person',
       t: 0.5,
-      stopT: 0.36,
-      exitT: 0.64,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
       speed: 0.4,
     })
@@ -355,16 +359,97 @@ describe('actors finish a crossing and increment quota', () => {
     const game = fresh()
     const car = addActor(game, {
       kind: 'car',
-      t: 0.62,
-      stopT: 0.36,
-      exitT: 0.64,
+      t: 0.72,
+      stopT: 0.26,
+      exitT: 0.74,
       committed: true,
       speed: 0.2,
     })
     tick(game, 0.2)
-    expect(car.t).toBeGreaterThan(0.64)
+    expect(car.t).toBeGreaterThan(0.74)
     expect(car.committed).toBe(false)
     tick(game, 2)
     expect(game.carsCleared).toBe(1)
+  })
+})
+
+describe('lanes lock heading', () => {
+  it('a car on lane 0 always has heading 1', () => {
+    const game = fresh()
+    const car = addActor(game, { kind: 'car', lane: 0, heading: -1 })
+    expect(car.lane).toBe(0)
+    expect(car.heading).toBe(1)
+    expect(car.stopT).toBe(DEFAULT_STOP_T)
+    expect(car.exitT).toBe(DEFAULT_EXIT_T)
+  })
+
+  it('a car on lane 1 always has heading -1', () => {
+    const game = fresh()
+    const car = addActor(game, { kind: 'car', lane: 1, heading: 1 })
+    expect(car.lane).toBe(1)
+    expect(car.heading).toBe(-1)
+  })
+
+  it('a person on lane 0 always has heading 1', () => {
+    const game = fresh()
+    const person = addActor(game, { kind: 'person', lane: 0, heading: -1 })
+    expect(person.lane).toBe(0)
+    expect(person.heading).toBe(1)
+  })
+
+  it('a person on lane 1 always has heading -1', () => {
+    const game = fresh()
+    const person = addActor(game, { kind: 'person', lane: 1, heading: 1 })
+    expect(person.lane).toBe(1)
+    expect(person.heading).toBe(-1)
+  })
+})
+
+describe('same-lane actors keep a gap and stop before the crossing', () => {
+  it('two cars same lane never overlap', () => {
+    const game = fresh()
+    const rear = addActor(game, { kind: 'car', lane: 0, t: 0.0, speed: 0.5 })
+    const front = addActor(game, { kind: 'car', lane: 0, t: CAR_GAP, speed: 0.28 })
+    let compared = 0
+    for (let i = 0; i < 80; i += 1) {
+      tick(game, 0.05)
+      if (rear.t < 1 && front.t < 1) {
+        expect(front.t - rear.t).toBeGreaterThanOrEqual(CAR_GAP - 1e-9)
+        compared += 1
+      }
+    }
+    expect(compared).toBeGreaterThan(10)
+  })
+
+  it('two people same lane never overlap', () => {
+    const game = fresh()
+    game.signal = 'people'
+    const rear = addActor(game, { kind: 'person', lane: 0, t: 0.0, speed: 0.35 })
+    const front = addActor(game, { kind: 'person', lane: 0, t: PERSON_GAP, speed: 0.18 })
+    let compared = 0
+    for (let i = 0; i < 80; i += 1) {
+      tick(game, 0.05)
+      if (rear.t < 1 && front.t < 1) {
+        expect(front.t - rear.t).toBeGreaterThanOrEqual(PERSON_GAP - 1e-9)
+        compared += 1
+      }
+    }
+    expect(compared).toBeGreaterThan(10)
+  })
+
+  it('waiting actors sit at or behind the stop line, not on the stripes', () => {
+    const game = fresh()
+    game.signal = 'people'
+    const lead = addActor(game, { kind: 'car', lane: 0, t: 0.1, speed: 0.4 })
+    const stacked = addActor(game, { kind: 'car', lane: 0, t: -0.05, speed: 0.4 })
+    tick(game, 1.2)
+    expect(lead.waiting).toBe(true)
+    expect(lead.t).toBeLessThanOrEqual(lead.stopT)
+    expect(lead.t).toBe(DEFAULT_STOP_T)
+    expect(stacked.t).toBeLessThanOrEqual(lead.t - CAR_GAP + 1e-9)
+    expect(lead.t).toBeLessThanOrEqual(DEFAULT_STOP_T)
+    expect(stacked.t).toBeLessThanOrEqual(DEFAULT_STOP_T)
+    expect(lead.t > lead.stopT && lead.t < lead.exitT).toBe(false)
+    expect(stacked.t > stacked.stopT && stacked.t < stacked.exitT).toBe(false)
   })
 })
